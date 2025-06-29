@@ -1,0 +1,44 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+      token: "{{ vault_root_token }}"
+  block:
+    - name: Create a KV mount
+      flowerysong.hvault.engine:
+        path: secret
+        type: kv
+        options:
+          version: 1
+
+    - name: Create some secrets
+      flowerysong.hvault.kv:
+        key: "{{ item }}"
+        value:
+          value: pong
+      loop:
+        - ping
+        - ping/pong
+
+    - name: Delete a secret
+      flowerysong.hvault.delete:
+        path: secret/ping/pong
+      loop: [0, 1]
+
+    - name: List secrets
+      flowerysong.hvault.list:
+        path: secret
+      register: result
+
+    - assert:
+        that:
+          - result.result.data['keys'] == ['ping']
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

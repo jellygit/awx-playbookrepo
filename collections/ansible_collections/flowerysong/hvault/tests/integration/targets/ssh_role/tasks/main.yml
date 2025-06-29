@@ -1,0 +1,108 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+      token: "{{ vault_root_token }}"
+  block:
+    - name: Create the SSH mounts
+      flowerysong.hvault.engine:
+        path: "{{ item }}"
+        type: ssh
+      loop:
+        - ssh
+        - ssh-client-signer
+
+    - name: Pretend to create a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        allow_host_certificates: true
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Create a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        allow_host_certificates: true
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Pretend to modify a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        allow_user_certificates: true
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Modify a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        allow_user_certificates: true
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Pretend to delete a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        state: absent
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Delete a role
+      flowerysong.hvault.ssh_role:
+        name: testrole
+        state: absent
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Create a complex role
+      flowerysong.hvault.ssh_role:
+        mount_point: ssh-client-signer
+        name: testrole
+        allow_user_certificates: true
+        default_user: ec2-user
+        default_extensions:
+          permit-pty: ""
+        ttl: 1800
+        max_ttl: 1800
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+  always:
+    - import_role:
+        name: setup_vault_teardown

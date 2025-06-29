@@ -1,0 +1,101 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  block:
+    - name: Pretend to seal
+      flowerysong.hvault.seal:
+        state: sealed
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Seal
+      flowerysong.hvault.seal:
+        state: sealed
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Seal sealed Vault
+      flowerysong.hvault.seal:
+        state: sealed
+      register: result
+
+    - assert:
+        that:
+          - result is not changed
+
+    - name: Pretend to unseal
+      flowerysong.hvault.seal:
+        state: unsealed
+        key: "{{ item }}"
+      loop: "{{ vault_unseal_keys }}"
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result.results | select('changed') | length == 5
+          - result.results.4.status.sealed
+
+    - name: Unseal
+      flowerysong.hvault.seal:
+        state: unsealed
+        key: "{{ item }}"
+      loop: "{{ vault_unseal_keys }}"
+      register: result
+
+    - assert:
+        that:
+          - result.results | select('changed') | length == 2
+          - result.results.0.status.sealed
+          - result.results | selectattr('status.sealed') | length == 1
+
+    - name: Seal
+      flowerysong.hvault.seal:
+
+    - name: Unseal
+      flowerysong.hvault.seal:
+        state: unsealed
+        keys: "{{ vault_unseal_keys }}"
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+          - not result.status.sealed
+
+    - name: Seal
+      flowerysong.hvault.seal:
+
+    - name: Progress unsealing
+      flowerysong.hvault.seal:
+        state: unsealed
+        key: "{{ vault_unseal_keys.0 }}"
+      register: result
+
+    - assert:
+        that:
+          - result.status.progress == 1
+          - result.status.sealed
+
+    - name: Reset unsealing progress
+      flowerysong.hvault.seal:
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+          - result.status.progress == 0
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

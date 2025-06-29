@@ -1,0 +1,118 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  block:
+    - name: Get mounted auth_methods
+      flowerysong.hvault.auth_method_info:
+      register: result
+
+    - name: Pretend to create an LDAP mount
+      flowerysong.hvault.auth_method:
+        path: ldap
+        type: ldap
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Create an LDAP mount
+      flowerysong.hvault.auth_method:
+        path: ldap
+        type: ldap
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+          - result.results.0.mount == result.results.1.mount
+
+    - name: Pretend to delete ldap/
+      flowerysong.hvault.auth_method:
+        path: ldap
+        state: absent
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Fetch current mounts
+      flowerysong.hvault.auth_method_info:
+      # While we're at it, make sure that auth_method_info runs in check mode
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - "'ldap/' in result.mounts"
+
+    - name: Delete ldap/
+      flowerysong.hvault.auth_method:
+        path: ldap
+        state: absent
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Fetch current mounts
+      flowerysong.hvault.auth_method_info:
+      register: result
+
+    - assert:
+        that:
+          - "'ldap/' not in result.mounts"
+
+    - name: Create a mount with a lot of parameters
+      flowerysong.hvault.auth_method:
+        path: ldap/
+        type: ldap
+        description: LDAP authentication for dc=example,dc=edu
+        default_lease_ttl: 3600
+        max_lease_ttl: 3700
+        token_type: service
+        listing_visibility: unauth
+        passthrough_request_headers:
+          - X-Foo
+          - Y-Foo
+        allowed_response_headers:
+          - X-Bar
+          - Y-Bar
+        audit_non_hmac_request_keys:
+          - foo
+          - foob
+        audit_non_hmac_response_keys:
+          - bar
+          - barb
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Reset the parameters to default
+      flowerysong.hvault.auth_method:
+        path: ldap
+        type: ldap
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

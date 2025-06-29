@@ -1,0 +1,32 @@
+{
+ "collection_info": {
+  "namespace": "flowerysong",
+  "name": "hvault",
+  "version": "0.3.0",
+  "authors": [
+   "Paul Arthur <paul.arthur@flowerysong.com> (@flowerysong)"
+  ],
+  "readme": "README.md",
+  "tags": [
+   "hashicorp",
+   "vault",
+   "hashi_vault"
+  ],
+  "description": "Plugins for interacting with HashiCorp Vault",
+  "license": [],
+  "license_file": "COPYING",
+  "dependencies": {},
+  "repository": "https://github.com/flowerysong/ansible-flowerysong.hvault",
+  "documentation": null,
+  "homepage": null,
+  "issues": "https://github.com/flowerysong/ansible-flowerysong.hvault/issues"
+ },
+ "file_manifest_file": {
+  "name": "FILES.json",
+  "ftype": "file",
+  "chksum_type": "sha256",
+  "chksum_sha256": "b13a28f60202ee0dcef5dd0b05d8c5f93c73ed8f8843ef5af9a3ed6556f99292",
+  "format": 1
+ },
+ "format": 1
+}

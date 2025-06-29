@@ -1,0 +1,8 @@
+storage "inmem" {}
+listener "tcp" {
+    address = "127.0.0.1:{{ vault_port }}"
+    tls_disable = true
+}
+disable_mlock = true
+log_level = "Debug"
+pid_file = "{{ output_dir }}/vault.pid"

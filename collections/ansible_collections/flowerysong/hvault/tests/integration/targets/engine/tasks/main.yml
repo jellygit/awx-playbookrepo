@@ -1,0 +1,154 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  block:
+    - name: Get mounted secret engines
+      flowerysong.hvault.engine_info:
+      register: result
+
+    - name: Pretend to create a KV version 1 mount
+      flowerysong.hvault.engine:
+        path: secret
+        type: kv
+        options:
+          version: 1
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Create and upgrade a KV mount
+      flowerysong.hvault.engine:
+        path: secret
+        type: kv
+        options:
+          version: "{{ item }}"
+      loop: [1, 1, 2]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.0.mount.options.version == '1'
+          - result.results.1 is not changed
+          - result.results.1.mount.options.version == '1'
+          - result.results.1.mount == result.results.0.mount
+          - result.results.2 is changed
+          - result.results.2.mount.options.version == '2'
+          - result.results | map(attribute='mount.accessor') | unique | length == 1
+          - result.results | map(attribute='mount.type') | unique == ['kv']
+
+    - name: Pretend to delete secret/
+      flowerysong.hvault.engine:
+        path: secret
+        state: absent
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Fetch current mounts
+      flowerysong.hvault.engine_info:
+      # While we're at it, make sure that engine_info runs in check mode
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - "'secret/' in result.mounts"
+
+    - name: Delete secret/
+      flowerysong.hvault.engine:
+        path: secret
+        state: absent
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Fetch current mounts
+      flowerysong.hvault.engine_info:
+      register: result
+
+    - assert:
+        that:
+          - "'secret/' not in result.mounts"
+
+    - name: Create a mount with a lot of parameters
+      flowerysong.hvault.engine:
+        path: ssh/
+        type: ssh
+        description: SSH signer for client certificates
+        default_lease_ttl: 3600
+        max_lease_ttl: 3700
+        force_no_cache: true
+        listing_visibility: unauth
+        passthrough_request_headers:
+          - X-Foo
+          - Y-Foo
+        allowed_response_headers:
+          - X-Bar
+          - Y-Bar
+        audit_non_hmac_request_keys:
+          - foo
+          - foob
+        audit_non_hmac_response_keys:
+          - bar
+          - barb
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Reset the parameters to default
+      flowerysong.hvault.engine:
+        path: ssh
+        type: ssh
+        # FIXME: This appears to be immutable once set
+        force_no_cache: true
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Attempt to overwrite a mount
+      flowerysong.hvault.engine:
+        path: ssh
+        type: generic
+      ignore_errors: true
+      register: result
+
+    - assert:
+        that:
+          - result is failed
+          - "'force is false' in result.msg"
+
+    - name: Overwrite a mount
+      flowerysong.hvault.engine:
+        path: ssh
+        type: generic
+        force: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+          - result.mount.type == 'generic'
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

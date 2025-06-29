@@ -1,0 +1,62 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  block:
+    - name: Create an LDAP mount
+      flowerysong.hvault.auth_method:
+        path: ldap
+        type: ldap
+
+    - name: Configure a group
+      flowerysong.hvault.ldap_group:
+        name: blackops
+        policies: default
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+    - name: Reconfigure the group
+      flowerysong.hvault.ldap_group:
+        name: blackops
+        policies:
+          - default
+          - blackops
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+    - name: Delete the group
+      flowerysong.hvault.ldap_group:
+        name: blackops
+        state: absent
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

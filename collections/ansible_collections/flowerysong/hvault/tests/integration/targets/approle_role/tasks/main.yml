@@ -1,0 +1,106 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+      token: "{{ vault_root_token }}"
+  block:
+    - name: Create the approle mounts
+      flowerysong.hvault.auth_method:
+        path: "{{ item }}"
+        type: approle
+      loop:
+        - approle
+        - approle-also
+
+    - name: Pretend to create a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Create a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Pretend to modify a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+        secret_id_num_uses: 20
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Modify a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+        secret_id_num_uses: 20
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Pretend to delete a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+        state: absent
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Delete a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+        state: absent
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Create a complex role
+      flowerysong.hvault.approle_role:
+        mount_point: approle-also
+        name: testrole
+        bind_secret_id: false
+        secret_id_bound_cidrs:
+          - 127.0.0.1/32
+        token_ttl: 300
+        token_max_ttl: 600
+        token_num_uses: 100
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+  always:
+    - import_role:
+        name: setup_vault_teardown

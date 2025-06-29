@@ -1,0 +1,27 @@
+action_groups:
+  hvault:
+  - flowerysong.hvault.approle_role
+  - flowerysong.hvault.approle_secret_id
+  - flowerysong.hvault.auth_approle
+  - flowerysong.hvault.auth_method
+  - flowerysong.hvault.auth_method_info
+  - flowerysong.hvault.aws_auth_role
+  - flowerysong.hvault.aws_secret_role_iam
+  - flowerysong.hvault.aws_secret_role_sts
+  - flowerysong.hvault.delete
+  - flowerysong.hvault.engine
+  - flowerysong.hvault.engine_info
+  - flowerysong.hvault.init
+  - flowerysong.hvault.kv
+  - flowerysong.hvault.kv_v2
+  - flowerysong.hvault.ldap_config
+  - flowerysong.hvault.ldap_group
+  - flowerysong.hvault.ldap_user
+  - flowerysong.hvault.list
+  - flowerysong.hvault.policy
+  - flowerysong.hvault.policy_info
+  - flowerysong.hvault.read
+  - flowerysong.hvault.seal
+  - flowerysong.hvault.ssh_role
+  - flowerysong.hvault.write
+requires_ansible: '>=2.11'

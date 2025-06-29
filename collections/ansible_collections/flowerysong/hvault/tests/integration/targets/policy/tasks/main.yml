@@ -1,0 +1,126 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  block:
+    - name: Fetch existing ACLs
+      flowerysong.hvault.policy_info:
+
+    - name: Pretend to create a policy
+      flowerysong.hvault.policy:
+        name: testpol
+        policy:
+          path:
+            secret:
+              capabilities:
+                - list
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Create a policy
+      flowerysong.hvault.policy:
+        name: testpol
+        policy:
+          path:
+            secret:
+              capabilities:
+                - list
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+          - result.results.0.policy == result.results.1.policy
+
+    - name: Test terse policies
+      flowerysong.hvault.policy:
+        name: testpol
+        policy: "{{ item }}"
+      loop:
+        - "{{ policy }}"
+        - "{{ policy }}"
+        - "{{ { 'path': policy } }}"
+        - secret: [list]
+          secret/*: [list]
+      vars:
+        policy:
+          secret:
+            capabilities:
+              - list
+          secret/*:
+            capabilities:
+              - list
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+    - name: Pretend to delete a policy
+      flowerysong.hvault.policy:
+        name: testpol
+        state: absent
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Fetch ACLs
+      flowerysong.hvault.policy_info:
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - "'testpol' in result.policies"
+
+    - name: Delete a policy
+      flowerysong.hvault.policy:
+        name: testpol
+        state: absent
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+
+    - name: Fetch ACLs
+      flowerysong.hvault.policy_info:
+      register: result
+
+    - assert:
+        that:
+          - "'testpol' not in result.policies"
+
+    - name: Write an HCL policy
+      flowerysong.hvault.policy:
+        name: testhcl
+        policy: |
+          path "secret" {
+            capabilities = ["list"]
+          }
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is not changed
+  always:
+    - import_role:
+        name: setup_vault_teardown

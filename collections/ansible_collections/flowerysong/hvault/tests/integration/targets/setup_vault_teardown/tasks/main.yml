@@ -1,0 +1,7 @@
+- name: Get Vault PID
+  ansible.builtin.slurp:
+    src: "{{ output_dir }}/vault.pid"
+  register: result
+
+- name: Kill Vault server
+  ansible.builtin.command: kill {{ result.content | b64decode }}

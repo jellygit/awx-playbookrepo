@@ -1,0 +1,54 @@
+- name: Fetch Vault tarball
+  ansible.builtin.get_url:
+    url: https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_{{ test_platform }}_{{ test_arch }}.zip
+    # FIXME: This is a bit hacky
+    dest: "{{ output_dir }}/../vault.zip"
+
+- name: Extract Vault tarball
+  ansible.builtin.unarchive:
+    src: "{{ output_dir }}/../vault.zip"
+    dest: "{{ output_dir }}/.."
+
+- name: Configure Vault
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: "{{ output_dir }}/vault.hcl"
+
+- name: Run Vault
+  ansible.builtin.shell: "{{ output_dir }}/../vault server -config {{ output_dir }}/vault.hcl > {{ output_dir }}/vault.log 2>&1"
+  async: 300
+  poll: 0
+
+- name: Wait for Vault to be available
+  ansible.builtin.wait_for:
+    port: "{{ vault_port }}"
+
+- when: vault_init
+  block:
+    - name: Initialize Vault
+      flowerysong.hvault.init:
+        vault_addr: "{{ vault_addr }}"
+        secret_shares: 5
+        secret_threshold: 2
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Save the secrets
+      set_fact:
+        vault_root_token: "{{ result.root_token }}"
+        vault_unseal_keys: "{{ result['keys'] }}"
+
+    - name: Unseal Vault
+      flowerysong.hvault.seal:
+        vault_addr: "{{ vault_addr }}"
+        state: unsealed
+        keys: "{{ vault_unseal_keys }}"
+  rescue:
+    - import_role:
+        name: setup_vault_teardown
+
+    - fail:
+        msg: vault init failed

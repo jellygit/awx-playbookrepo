@@ -1,0 +1,32 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+      token: "{{ vault_root_token }}"
+  block:
+    - name: Create a KV mount
+      flowerysong.hvault.engine:
+        path: secret
+        type: kv
+        options:
+          version: 1
+
+    - name: Create secret/ping
+      flowerysong.hvault.kv:
+        key: ping
+        value:
+          value: pong
+
+    - assert:
+        that:
+          - "lookup('flowerysong.hvault.read', 'secret/ping', **vault_conf) == {'value': 'pong'}"
+          - "lookup('flowerysong.hvault.read', 'secret/ping', raw=true, **vault_conf).data == {'value': 'pong'}"
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

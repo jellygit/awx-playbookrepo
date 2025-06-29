@@ -1,0 +1,134 @@
+name: ansible-test
+on:
+  push:
+  pull_request:
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COLL_NS: flowerysong
+  COLL_NAME: hvault
+  ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}
+
+jobs:
+  build_collection:
+    name: build collection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'git+https://github.com/ansible/ansible@stable-2.14#egg=ansible-core'
+
+      - name: Build collection
+        run: ansible-galaxy collection build -vv
+
+      - name: Install collection
+        run: ansible-galaxy collection install ${{ env.COLL_NS }}-${{ env.COLL_NAME }}-*.tar.gz
+
+      - name: Make sure metadata is up to date
+        run: |
+          ./update-meta.py
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0
+
+      - name: Upload collection
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.COLL_NS }}-${{ env.COLL_NAME }}-*.tar.gz
+          name: ${{ env.COLL_NS }}-${{ env.COLL_NAME }}
+
+  static_analysis:
+    needs: build_collection
+    name: static analysis (${{ matrix.ansible_version }}, py${{ matrix.python_version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version:
+          - 3.12
+        ansible_version:
+          - stable-2.16
+          - stable-2.17
+          - stable-2.18
+          - devel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'git+https://github.com/ansible/ansible@${{ matrix.ansible_version }}#egg=ansible-core' pycodestyle pylint pyyaml voluptuous yamllint junit-xml
+
+      - name: Download collection
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.COLL_NS }}-${{ env.COLL_NAME }}
+
+      - name: Install collection
+        run: ansible-galaxy collection install ${{ env.COLL_NS }}-${{ env.COLL_NAME }}-*.tar.gz
+
+      - name: Run tests
+        run: ansible-test sanity -v --color --docker
+        working-directory: ./ansible_collections/${{ env.COLL_NS }}/${{ env.COLL_NAME }}
+
+  integration:
+    name: integration (${{ matrix.ansible_version }}, py${{ matrix.python_version }}, Vault ${{ matrix.vault_version }})
+    needs: build_collection
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version:
+          - 3.11
+          - 3.12
+          - 3.13
+        ansible_version:
+          - stable-2.18
+        vault_version:
+          - 1.14.10
+        include:
+          - python_version: '3.10'
+            ansible_version: stable-2.17
+            vault_version: 1.14.10
+          - python_version: 3.13
+            ansible_version: devel
+            vault_version: 1.14.10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'git+https://github.com/ansible/ansible@${{ matrix.ansible_version }}#egg=ansible-core' pyyaml junit-xml
+
+      - name: Download collection
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.COLL_NS }}-${{ env.COLL_NAME }}
+
+      - name: Install collection
+        run: ansible-galaxy collection install ${{ env.COLL_NS }}-${{ env.COLL_NAME }}-*.tar.gz
+
+      - name: Set Vault version
+        run: "echo 'vault_version: ${{ matrix.vault_version }}' > tests/integration/integration_config.yml"
+        working-directory: ./ansible_collections/${{ env.COLL_NS }}/${{ env.COLL_NAME }}
+
+      - name: Run integration tests
+        run: ansible-test integration -vvv --color
+        working-directory: ./ansible_collections/${{ env.COLL_NS }}/${{ env.COLL_NAME }}

@@ -1,0 +1,85 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+  block:
+    - name: Create the approle mount
+      flowerysong.hvault.auth_method:
+        path: approle
+        type: approle
+
+    - name: Create a role
+      flowerysong.hvault.approle_role:
+        name: testrole
+      register: role_result
+
+    - name: Create a SecretID
+      flowerysong.hvault.approle_secret_id:
+        role_name: testrole
+        metadata:
+          foo: bar
+      register: sid_result
+
+    - name: Authenticate with testrole using the lookup
+      set_fact:
+        auth_res: "{{ lookup('flowerysong.hvault.auth_approle', role_result.role.role_id, secret_id=sid_result.secret_id.secret_id, **vault_conf) }}"
+
+    - name: Fetch token info
+      flowerysong.hvault.read:
+        token: "{{ auth_res }}"
+        path: auth/token/lookup-self
+      register: result
+
+    - assert:
+        that:
+          - result.result.data.display_name == 'approle'
+          - result.result.data.meta.role_name == 'testrole'
+          - result.result.data.meta.foo == 'bar'
+
+    - name: Authenticate with testrole using the module
+      flowerysong.hvault.auth_approle:
+        role_id: "{{ role_result.role.role_id }}"
+        secret_id: "{{ sid_result.secret_id.secret_id }}"
+      check_mode: "{{ item == 0 }}"
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is skipped
+          - result.results.1 is changed
+          - "'client_token' in result.results.1.auth"
+          - "'accessor' in result.results.1.auth"
+          - result.results.1.auth.metadata.role_name == 'testrole'
+          - result.results.1.auth.metadata.foo == 'bar'
+
+    - name: Create an unbound role
+      flowerysong.hvault.approle_role:
+        name: testrole2
+        bind_secret_id: false
+        secret_id_bound_cidrs: 127.0.0.1/32
+      register: role_result
+
+    - name: Authenticate with testrole2 using the lookup
+      set_fact:
+        auth_res: "{{ lookup('flowerysong.hvault.auth_approle', role_result.role.role_id, **vault_conf) }}"
+
+    - name: Authenticate with testrole2 using the module
+      flowerysong.hvault.auth_approle:
+        role_id: "{{ role_result.role.role_id }}"
+      check_mode: "{{ item == 0 }}"
+      loop: [0, 1]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is skipped
+          - result.results.1 is changed
+
+    - import_role:
+        name: setup_vault_teardown

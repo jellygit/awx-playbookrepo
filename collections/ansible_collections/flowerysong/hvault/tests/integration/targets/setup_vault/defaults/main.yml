@@ -1,0 +1,6 @@
+vault_version: 1.7.0
+test_platform: linux
+test_arch: amd64
+vault_port: 18200
+vault_addr: http://127.0.0.1:{{ vault_port }}
+vault_init: true

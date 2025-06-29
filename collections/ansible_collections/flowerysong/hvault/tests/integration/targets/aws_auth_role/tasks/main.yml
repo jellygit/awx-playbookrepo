@@ -1,0 +1,71 @@
+- import_role:
+    name: setup_vault
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+  vars:
+    vault_conf:
+      vault_addr: "{{ vault_addr }}"
+      token: "{{ vault_root_token }}"
+  block:
+    - name: Create the aws mounts
+      flowerysong.hvault.auth_method:
+        path: "{{ item }}"
+        type: aws
+      loop:
+        - aws
+        - aws-also
+
+    - name: Create a role
+      flowerysong.hvault.aws_auth_role:
+        name: testrole
+        bound_iam_principal_arn: arn:aws:iam::123456789012:*
+        resolve_aws_unique_ids: false
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+    - name: Modify a role
+      flowerysong.hvault.aws_auth_role:
+        name: testrole
+        bound_iam_principal_arn:
+          - arn:aws:iam::321456789012:*
+          - arn:aws:iam::123456789012:*
+        resolve_aws_unique_ids: false
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+    - name: Delete a role
+      flowerysong.hvault.aws_auth_role:
+        name: testrole
+        state: absent
+      check_mode: "{{ item % 2 == 0 }}"
+      loop: [0, 1, 2, 3]
+      register: result
+
+    - assert:
+        that:
+          - result.results.0 is changed
+          - result.results.1 is changed
+          - result.results.2 is not changed
+          - result.results.3 is not changed
+
+  always:
+    - import_role:
+        name: setup_vault_teardown

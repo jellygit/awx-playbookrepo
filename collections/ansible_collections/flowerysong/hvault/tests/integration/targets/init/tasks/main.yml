@@ -1,0 +1,41 @@
+- import_role:
+    name: setup_vault
+  vars:
+    vault_init: false
+
+- environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+  block:
+    - name: Pretend to initialize Vault
+      flowerysong.hvault.init:
+      check_mode: true
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+
+    - name: Initialize Vault
+      flowerysong.hvault.init:
+      register: result
+
+    - assert:
+        that:
+          - result is changed
+          - result.initialized == true
+          - "'root_token' in result"
+          - "'keys' in result"
+          - "'keys_base64' in result"
+
+    - name: Try to reinitialize Vault
+      flowerysong.hvault.init:
+      register: result
+
+    - assert:
+        that:
+          - result is not changed
+          - result.initialized == true
+
+  always:
+    - import_role:
+        name: setup_vault_teardown
