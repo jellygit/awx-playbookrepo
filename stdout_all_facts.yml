@@ -3,7 +3,7 @@
   # 인벤토리에 정의된 모든 호스트를 대상으로 합니다.
   hosts: all
   
-  # [수정] Facts 수집 단계를 건너뛰어 AWX에 캐시된 데이터를 사용합니다.
+  # Facts 수집 단계를 건너뛰어 AWX에 캐시된 데이터를 사용합니다.
   gather_facts: no
   
   # 변수 정의
@@ -28,13 +28,19 @@
         msg: |
           {{ csv_header }}
           {% for host in ansible_play_hosts_all %}
-          {%   set facts = hostvars[host].ansible_facts %}
-          {{- host -}}
-          ,{{- facts.distribution | default('N/A') -}}
-          ,{{- facts.distribution_version | default('N/A') -}}
-          ,{{- facts.memtotal_mb | default('N/A') -}}
-          ,{{- facts.processor_vcpus | default('N/A') -}}
-          ,{{- facts.default_ipv4.address | default('N/A') -}}
+          {# [수정] 각 호스트에 대해 ansible_facts가 정의되어 있는지 먼저 확인합니다. #}
+          {%   if hostvars[host].ansible_facts is defined %}
+          {%     set facts = hostvars[host].ansible_facts %}
+          {{-      host -}}
+          ,{{-      facts.distribution | default('N/A') -}}
+          ,{{-      facts.distribution_version | default('N/A') -}}
+          ,{{-      facts.memtotal_mb | default('N/A') -}}
+          ,{{-      facts.processor_vcpus | default('N/A') -}}
+          ,{{-      facts.default_ipv4.address | default('N/A') -}}
+          {%   else %}
+          {# Facts가 없는 호스트에 대한 처리 #}
+          {{-      host -}},FACTS_NOT_FOUND,N/A,N/A,N/A,N/A
+          {%   endif %}
           {% endfor %}
 
 
