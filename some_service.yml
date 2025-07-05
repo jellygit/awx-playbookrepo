@@ -1,0 +1,52 @@
+---
+- name: Add ExecStop to tailscaled service and reload systemd
+  # 이 플레이북을 실행할 호스트 그룹을 지정합니다.
+  hosts: all
+  
+  # 시스템 파일을 수정하고 systemd를 제어해야 하므로 루트 권한이 필요합니다.
+  become: yes
+
+  tasks:
+    # ----------------------------------------------------------------
+    # 단계 1: Systemd 오버라이드 디렉토리 생성
+    # ----------------------------------------------------------------
+    - name: "Ensure the override directory for tailscaled.service exists"
+      # file 모듈을 사용하여 오버라이드 설정을 담을 디렉토리를 생성합니다.
+      # 이 디렉토리가 이미 존재하면 아무 작업도 하지 않습니다.
+      ansible.builtin.file:
+        path: "/etc/systemd/system/multi-user.target.wants"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # ----------------------------------------------------------------
+    # 단계 2: ExecStop 설정이 포함된 오버라이드 파일 생성
+    # ----------------------------------------------------------------
+    - name: "Add ExecStop configuration using an override file"
+      # blockinfile 모듈을 사용하여 파일에 특정 블록이 존재하는지 확인하고, 없으면 추가합니다.
+      # 이 방법은 멱등성(idempotence)을 보장하여 여러 번 실행해도 안전합니다.
+      ansible.builtin.blockinfile:
+        path: "/etc/systemd/system/multi-user.target.wants/tailscaled.service"
+        section: "Service"
+        option: "ExecStop"
+        value: "/usr/sbin/tailscaled -s stop"
+        create: yes # 파일이 없으면 새로 생성합니다.
+        owner: root
+        group: root
+        mode: '0644'
+      
+      # [핵심] 이 작업으로 인해 파일 내용이 변경되었을 경우에만 'handler'를 호출합니다.
+      notify: Reload systemd daemon
+
+  # ------------------------------------------------------------------
+  # 핸들러(Handlers): 특정 작업에 의해 호출될 때만 실행되는 작업
+  # ------------------------------------------------------------------
+    - name: Reload systemd daemon
+  handlers:
+      # systemd 모듈을 사용하여 'systemctl daemon-reload'를 실행합니다.
+      # 이 핸들러는 오버라이드 파일이 실제로 생성되거나 변경되었을 때만 단 한 번 실행됩니다.
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+
