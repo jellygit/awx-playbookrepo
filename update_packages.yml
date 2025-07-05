@@ -1,0 +1,48 @@
+---
+- name: Update all packages on Linux servers (EL and Debian compatible)
+  # 인벤토리에 정의된 모든 호스트를 대상으로 합니다.
+  hosts: all
+  
+  # 패키지 관리는 루트 권한이 필요하므로 become을 사용합니다.
+  become: yes
+  
+  # 플레이북의 설명을 추가합니다.
+  # 이 플레이북은 RedHat 계열(Rocky, CentOS 등)과 Debian 계열(Ubuntu 등)의
+  # 시스템 패키지를 최신 버전으로 업데이트합니다.
+  
+  tasks:
+    # ----------------------------------------------------------------
+    # 작업 1: RedHat 계열 시스템 업데이트 (Rocky Linux, CentOS, RHEL 등)
+    # ----------------------------------------------------------------
+    - name: "Update all packages for RedHat family systems using DNF"
+      # dnf 모듈을 사용하여 모든 패키지(*)를 최신(latest) 상태로 업데이트합니다.
+      # 이 작업은 ansible_os_family가 'RedHat'일 때만 실행됩니다.
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        # 불필요한 패키지 자동 삭제 (권장)
+        autoremove: yes
+      when: ansible_os_family == "RedHat"
+
+    # ----------------------------------------------------------------
+    # 작업 2: Debian 계열 시스템 업데이트 (Ubuntu 등)
+    # ----------------------------------------------------------------
+    - name: "Update package cache for Debian family systems using APT"
+      # apt 모듈을 사용하여 'apt-get update'를 먼저 실행합니다.
+      # 이 작업은 ansible_os_family가 'Debian'일 때만 실행됩니다.
+      ansible.builtin.apt:
+        update_cache: yes
+        # 캐시 유효 기간을 설정하여 불필요한 반복을 줄입니다. (예: 1시간)
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: "Upgrade all packages for Debian family systems using APT"
+      # apt 모듈을 사용하여 'apt-get dist-upgrade'를 실행합니다.
+      # 'dist' 옵션은 커널을 포함한 모든 의존성 변경을 지능적으로 처리합니다.
+      # 이 작업은 ansible_os_family가 'Debian'일 때만 실행됩니다.
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: yes
+      when: ansible_os_family == "Debian"
+
+
