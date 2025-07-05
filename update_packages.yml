@@ -20,7 +20,13 @@
       ansible.builtin.dnf:
         name: "*"
         state: latest
-        # 불필요한 패키지 자동 삭제 (권장)
+      when: ansible_os_family == "RedHat"
+
+    # [수정] 불필요한 의존성 제거 작업을 별도의 작업으로 분리
+    - name: "Remove unused packages for RedHat family (autoremove)"
+      # dnf 모듈의 autoremove는 단독으로 사용해야 합니다.
+      # 이 작업은 업데이트 후 사용되지 않는 패키지를 정리합니다.
+      ansible.builtin.dnf:
         autoremove: yes
       when: ansible_os_family == "RedHat"
 
@@ -39,7 +45,7 @@
     - name: "Upgrade all packages for Debian family systems using APT"
       # apt 모듈을 사용하여 'apt-get dist-upgrade'를 실행합니다.
       # 'dist' 옵션은 커널을 포함한 모든 의존성 변경을 지능적으로 처리합니다.
-      # 이 작업은 ansible_os_family가 'Debian'일 때만 실행됩니다.
+      # apt 모듈은 autoremove를 upgrade와 함께 사용하는 것을 허용합니다.
       ansible.builtin.apt:
         upgrade: dist
         autoremove: yes
