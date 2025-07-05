@@ -1,0 +1,43 @@
+---
+- name: Gather facts from all hosts and save them to local files
+  # 인벤토리에 정의된 모든 호스트를 대상으로 합니다.
+  # 특정 그룹만 대상으로 하려면 'all'을 그룹 이름으로 변경하세요.
+  hosts: all
+  
+  # Facts 수집은 Ansible의 기본 동작이지만, 명시적으로 켜두는 것이 좋습니다.
+  gather_facts: yes
+
+  # 플레이북에서 사용할 변수를 정의합니다.
+  vars:
+    # 수집된 Facts 파일이 저장될 로컬 디렉토리 이름
+    facts_output_dir: "collected_facts"
+
+  tasks:
+    # ----------------------------------------------------------------
+    # 단계 1: 결과 저장을 위한 로컬 디렉토리 생성
+    # ----------------------------------------------------------------
+    - name: "Create a directory on the local machine to store fact files"
+      # delegate_to: localhost -> 이 작업은 원격 서버가 아닌 Ansible 실행 PC에서 수행합니다.
+      # run_once: true -> 여러 호스트에 대해 이 작업은 딱 한 번만 실행합니다.
+      ansible.builtin.file:
+        path: "{{ facts_output_dir }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+
+    # ----------------------------------------------------------------
+    # 단계 2: 각 호스트의 Facts를 별도의 JSON 파일로 저장
+    # ----------------------------------------------------------------
+    - name: "Save facts for each host to a JSON file"
+      # delegate_to: localhost -> 파일이 원격 서버가 아닌 로컬 PC에 생성됩니다.
+      delegate_to: localhost
+      
+      # copy 모듈의 content 속성을 사용하여 변수 내용을 파일로 직접 씁니다.
+      ansible.builtin.copy:
+        # to_nice_json 필터는 변수를 사람이 읽기 좋은 형태의 JSON으로 변환해 줍니다.
+        content: "{{ ansible_facts | to_nice_json }}"
+        
+        # 파일 이름에 inventory_hostname 변수를 사용하여 각 호스트별로 파일을 생성합니다.
+        # 예: collected_facts/server1.example.com.json
+        dest: "{{ facts_output_dir }}/{{ inventory_hostname }}.json"
+
